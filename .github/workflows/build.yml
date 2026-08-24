@@ -1,38 +1,125 @@
-name: Build ESP32-C6 Firmware
+name: Build ESP32-C6 N16 OLED
 
 on:
-  workflow_dispatch: # Build ONLY when you manually click "Run workflow"
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+
+      # -------------------------------------------------------
+      # Download repository
+      # -------------------------------------------------------
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Arduino CLI
+
+      # -------------------------------------------------------
+      # Install Arduino CLI
+      # -------------------------------------------------------
+      - name: Install Arduino CLI
         uses: arduino/setup-arduino-cli@v2
 
-      - name: Install ESP32 Board Core
+
+      # -------------------------------------------------------
+      # Configure ESP32 Arduino package
+      # -------------------------------------------------------
+      - name: Configure ESP32 Arduino Core
         run: |
           arduino-cli config init
-          arduino-cli config set board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+
+          arduino-cli config set board_manager.additional_urls \
+            https://espressif.github.io/arduino-esp32/package_esp32_index.json
+
           arduino-cli core update-index
+
           arduino-cli core install esp32:esp32
 
-      - name: Install Libraries Directly
+
+      # -------------------------------------------------------
+      # Install OLED libraries
+      # -------------------------------------------------------
+      - name: Install OLED Libraries
         run: |
           arduino-cli lib update-index
+
           arduino-cli lib install "Adafruit GFX Library"
+
           arduino-cli lib install "Adafruit SSD1306"
 
-      - name: Compile Code
-        run: |
-          arduino-cli compile --fqbn esp32:esp32:esp32c6 --output-dir ./build .
 
-      - name: Upload Binaries
+      # -------------------------------------------------------
+      # Show installed environment
+      # -------------------------------------------------------
+      - name: Show Build Environment
+        run: |
+          echo "======================================"
+          echo "Arduino CLI"
+          echo "======================================"
+
+          arduino-cli version
+
+          echo ""
+          echo "======================================"
+          echo "Installed ESP32 Core"
+          echo "======================================"
+
+          arduino-cli core list
+
+          echo ""
+          echo "======================================"
+          echo "Installed Libraries"
+          echo "======================================"
+
+          arduino-cli lib list
+
+
+      # -------------------------------------------------------
+      # Compile ESP32-C6
+      #
+      # Board: ESP32-C6
+      # Flash: 16 MB
+      # -------------------------------------------------------
+      - name: Compile Firmware
+        run: |
+          mkdir -p build
+
+          arduino-cli compile \
+            --fqbn "esp32:esp32:esp32c6:FlashSize=16M" \
+            --output-dir ./build \
+            .
+
+
+      # -------------------------------------------------------
+      # Show generated files
+      # -------------------------------------------------------
+      - name: Show Firmware Files
+        run: |
+          echo "======================================"
+          echo "Generated firmware:"
+          echo "======================================"
+
+          ls -lh ./build/
+
+
+      # -------------------------------------------------------
+      # Package firmware
+      # -------------------------------------------------------
+      - name: Prepare Firmware Package
+        run: |
+          mkdir -p firmware
+
+          cp ./build/*.bin ./firmware/
+
+
+      # -------------------------------------------------------
+      # Upload firmware as downloadable artifact
+      # -------------------------------------------------------
+      - name: Upload Firmware
         uses: actions/upload-artifact@v4
         with:
-          name: esp32c6-firmware
-          path: ./build/*
+          name: esp32c6-n16-oled-firmware
+          path: ./firmware/
+          if-no-files-found: error
